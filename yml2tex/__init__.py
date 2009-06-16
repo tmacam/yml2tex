@@ -31,6 +31,8 @@ import sys
 import yaml
 from loader import PairLoader
 
+# TODO Beamer theme should be configurable
+
 
 parser = optparse.OptionParser(
     usage="usage: %prog source_file [options]",
@@ -66,10 +68,15 @@ def frame(title, items):
     elif title.startswith('image'):
         out = image(title, items)
     else:
-        out = "\n\\frame {"
+        out = "\n\\begin{frame}[fragile,t]"
         out += "\n\t\\frametitle{%s}" % _escape_output(title)
-        out += itemize(items)
-        out += "\n}"
+        try:
+            out += itemize(items)
+        except TypeError:
+            sys.stderr.write("ERR - ofending text %s %s\n" % (repr(title),
+                            repr(items)))
+            raise
+        out += "\n\\end{frame}"
     return out
 
 def _escape_output(text):
@@ -103,7 +110,10 @@ def itemize(items):
                 out += "\n\t\\item %s" % _escape_output(item[0][0])
                 out += itemize(item[0][1])
         else:
-            out += "\n\t\\item %s" % _escape_output(item)
+            if item.startswith('include'):
+                out += inlinecode(item)
+            else:
+                out += "\n\t\\item %s" % _escape_output(item)
     out += "\n\t\end{itemize}"
     return out
 
@@ -136,6 +146,36 @@ def code(title):
         
     f.close()
     out += "\n\end{frame}"
+    return out
+
+def inlinecode(title):
+    """
+    Return syntax highlighted LaTeX.
+    """
+    filename = title.split(' ')[1]
+    
+    # open the code file relative from the yml file path
+    f = open(os.path.join(os.path.dirname(os.path.abspath(source_file)), filename))
+
+    out = "\n\\vspace{0.5em}"
+    
+    try:
+        from pygments import highlight
+        from pygments.lexers import get_lexer_for_filename, get_lexer_by_name
+        from pygments.formatters import LatexFormatter
+        
+        try:
+            lexer = get_lexer_for_filename(filename)
+        except:
+            lexer = get_lexer_by_name('text')
+        out += "%s" % highlight(f.read(), lexer, LatexFormatter(linenos=True))
+    except ImportError:
+        out += "\n\t\\begin{lstlisting}\n"
+        out += f.read()
+        out += "\n\t\end{lstlisting}"
+        
+    f.close()
+    out += "\\vspace{0.5em}"
     return out
 
 def image(title, options):
