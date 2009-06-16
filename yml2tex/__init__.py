@@ -31,10 +31,18 @@ import sys
 import yaml
 from loader import PairLoader
 
+
 parser = optparse.OptionParser(
     usage="usage: %prog source_file [options]",
     version=__version__,
 )
+
+parser.add_option("-P", "--no-pause",
+                  dest="list_pause", action="store_false", default=True,
+                  help="Suppress emittion of pause/alert commands in lists.")
+
+global_options = None # Overwrite w/ result from OptParse.parse_args()
+
 
 def section(title):
     """
@@ -86,7 +94,9 @@ def itemize(items):
     The script itself doesn't limit the depth of nested lists. LaTeX Beamer 
     limits lists to be nested up to a depth of 3.
     """
-    out = "\n\t\\begin{itemize}[<+-| alert@+>]"
+    out = "\n\t\\begin{itemize}"
+    if global_options.list_pause:
+        out += "[<+-| alert@+>]"
     for item in items:
         if isinstance(item, list):
             for i in item:
@@ -205,7 +215,8 @@ def main():
     """
     Return the final LaTeX presentation after invoking all necessary functions.
     """
-    options, args = parser.parse_args(sys.argv[1:])
+    global global_options
+    global_options, args = parser.parse_args(sys.argv[1:])
     if not args:
         parser.print_help()
         sys.exit(1)
