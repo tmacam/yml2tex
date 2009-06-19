@@ -42,6 +42,10 @@ parser = optparse.OptionParser(
 parser.add_option("-P", "--no-pause",
                   dest="list_pause", action="store_false", default=True,
                   help="Suppress emittion of pause/alert commands in lists.")
+parser.add_option("-E", "--code-encoding",
+                  dest="code_encoding", default="UTF-8", metavar="ENCODING",
+                  help=("Sets the encoding used by include code. "
+                        "Default is UTF-8."))
 
 global_options = None # Overwrite w/ result from OptParse.parse_args()
 
@@ -117,18 +121,30 @@ def itemize(items):
     out += "\n\t\end{itemize}"
     return out
 
-def code(title):
-    """
-    Return syntax highlighted LaTeX.
-    """
-    filename = title.split(' ')[1]
+def _output_code(filename):
+    """Return code for filename in a LaTeX-ready format, possibly highlighted.
+
+    If pygments is available, code will be highlighted. Otherwise we will
+    use a plain lstlisting environment for the code.
+
+    Args:
+        filename: relative path of the file to be of code to be
+
+    Returns:
+        A Unicode string of the LaTeX version of the code to be included.
     
+    Notice: 
+        Enclosing Beamer frame should be marked as fragile.
+    """
     # open the code file relative from the yml file path
-    f = open(os.path.join(os.path.dirname(os.path.abspath(source_file)), filename))
-    
-    out = "\n\\begin{frame}[fragile,t]"
-    out += "\n\t\\frametitle{Code: \"%s\"}" % filename
-    
+    full_path = os.path.join(os.path.dirname(os.path.abspath(source_file)),
+                             filename)
+    f = open(full_path)
+    # Code can be in another charset, convert it to unicode first
+    code = f.read().decode(global_options.code_encoding)
+    f.close()
+
+    out = u""
     try:
         from pygments import highlight
         from pygments.lexers import get_lexer_for_filename, get_lexer_by_name
@@ -138,13 +154,26 @@ def code(title):
             lexer = get_lexer_for_filename(filename)
         except:
             lexer = get_lexer_by_name('text')
-        out += "\n%s\n" % highlight(f.read(), lexer, LatexFormatter(linenos=True))
+        # For propper highlighting, we must handle unicode data to highlight()
+        # This was performed at the start of this function, just proceed.
+        out += "\n%s\n" % highlight(code, lexer, LatexFormatter(linenos=True))
     except ImportError:
         out += "\n\t\\begin{lstlisting}\n"
-        out += f.read()
+        out += code
         out += "\n\t\end{lstlisting}"
-        
-    f.close()
+    # return code -- just make sure it is unicode
+    return unicode(out)
+
+def code(title):
+    """
+    Return syntax highlighted LaTeX.
+    """
+    filename = title.split(' ')[1]
+    
+    
+    out = "\n\\begin{frame}[fragile,t]"
+    out += "\n\t\\frametitle{Code: \"%s\"}" % filename
+    out += _output_code(filename)
     out += "\n\end{frame}"
     return out
 
@@ -154,27 +183,8 @@ def inlinecode(title):
     """
     filename = title.split(' ')[1]
     
-    # open the code file relative from the yml file path
-    f = open(os.path.join(os.path.dirname(os.path.abspath(source_file)), filename))
-
     out = "\n\\vspace{0.5em}"
-    
-    try:
-        from pygments import highlight
-        from pygments.lexers import get_lexer_for_filename, get_lexer_by_name
-        from pygments.formatters import LatexFormatter
-        
-        try:
-            lexer = get_lexer_for_filename(filename)
-        except:
-            lexer = get_lexer_by_name('text')
-        out += "%s" % highlight(f.read(), lexer, LatexFormatter(linenos=True))
-    except ImportError:
-        out += "\n\t\\begin{lstlisting}\n"
-        out += f.read()
-        out += "\n\t\end{lstlisting}"
-        
-    f.close()
+    out += _output_code(filename)
     out += "\\vspace{0.5em}"
     return out
 
@@ -285,6 +295,7 @@ def main():
             for frames, items in doc:
                 out += frame(frames, items)
     out += footer()
+    # LaTeX expects UTF-8 content
     return out.encode('utf-8')
 
 if __name__ == '__main__':
