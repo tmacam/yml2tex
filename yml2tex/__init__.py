@@ -85,16 +85,33 @@ def frame(title, items):
 
 def _escape_output(text):
     """Escape special characters in Latex"""
+    # FIXME Parse a character from input at a time and replace acordingly
+    # see more at ftp://tug.ctan.org/pub/tex-archive/info/symbols/comprehensive/symbols-letter.pdf
     dic = {'&': '\&', 
            '$': '\$', 
            '%': '\%', 
            '#': '\#', 
            '_': '\_', 
            '{': '\{', 
-           '}': '\}'}
-    
-    for i, j in dic.iteritems():  
-        text = text.replace(i, j)
+           '}': '\}',
+           '[': '\([\)',
+           ']': '\(]\)',
+           '<': r'\textless ',
+           '>': r'\textgreater ',
+           '|': r'\textbar~',
+           '|': r'\textbar~',
+           #'\\': r'\textbackslash~',
+           '^': r'\^{}'} 
+    # Escape letter that need to be escaped.
+    # 
+    # Since we process things a letter at a time we don't need to worry about
+    # re-escaping reviously escaped characters --- as it would be the case have
+    # we used replace.
+    out = []
+    for letter in text:
+        # If letter doesn't need to be escaped, print letter as is
+        out.append(dic.get(letter, letter))
+    text = "".join(out)
     return text
 
 def itemize(items):
